@@ -175,11 +175,11 @@ namespace DSR_Texture_Randomizer
                 switch (extension)
                 {
                     case ".tpf":
-                        TPF tpf = TPF.Unpack(bytes);
+                        TPF tpf = TPF.Read(bytes);
                         if (processTPF(tpf, looseDir, subpath))
                         {
                             edited = true;
-                            byte[] tpfBytes = tpf.Repack();
+                            byte[] tpfBytes = tpf.Write();
                             if (dcx)
                                 tpfBytes = DCX.Compress(tpfBytes);
                             writeRepack(absolute, tpfBytes);
@@ -195,11 +195,11 @@ namespace DSR_Texture_Randomizer
                         if (File.Exists(bdtPath))
                         {
                             byte[] bdtBytes = File.ReadAllBytes(bdtPath);
-                            BDT bdt = BDT.Unpack(bytes, bdtBytes);
+                            BDT bdt = BDT.Read(bytes, bdtBytes);
                             if (processBDT(bdt, looseDir, subpath))
                             {
                                 edited = true;
-                                (byte[], byte[]) repacked = bdt.Repack();
+                                (byte[], byte[]) repacked = bdt.Write();
                                 if (dcx)
                                 {
                                     repacked.Item1 = DCX.Compress(repacked.Item1);
@@ -219,19 +219,19 @@ namespace DSR_Texture_Randomizer
                     case ".fgbnd":
                     case ".objbnd":
                     case ".partsbnd":
-                        BND bnd = BND.Unpack(bytes);
-                        foreach (BNDEntry entry in bnd.Files)
+                        BND bnd = BND.Read(bytes);
+                        foreach (BND.File entry in bnd.Files)
                         {
                             if (stop)
                                 break;
 
-                            string entryExtension = Path.GetExtension(entry.Filename);
+                            string entryExtension = Path.GetExtension(entry.Name);
                             if (entryExtension == ".tpf")
                             {
-                                TPF bndTPF = TPF.Unpack(entry.Bytes);
+                                TPF bndTPF = TPF.Read(entry.Bytes);
                                 if (processTPF(bndTPF, looseDir, subpath))
                                 {
-                                    entry.Bytes = bndTPF.Repack();
+                                    entry.Bytes = bndTPF.Write();
                                     edited = true;
                                 }
                             }
@@ -245,10 +245,10 @@ namespace DSR_Texture_Randomizer
                                 if (File.Exists(bndBDTPath))
                                 {
                                     byte[] bdtBytes = File.ReadAllBytes(bndBDTPath);
-                                    BDT bndBDT = BDT.Unpack(entry.Bytes, bdtBytes);
+                                    BDT bndBDT = BDT.Read(entry.Bytes, bdtBytes);
                                     if (processBDT(bndBDT, looseDir, subpath))
                                     {
-                                        (byte[], byte[]) repacked = bndBDT.Repack();
+                                        (byte[], byte[]) repacked = bndBDT.Write();
                                         entry.Bytes = repacked.Item1;
                                         writeRepack(bndBDTPath, repacked.Item2);
                                         edited = true;
@@ -261,7 +261,7 @@ namespace DSR_Texture_Randomizer
 
                         if (edited && !stop)
                         {
-                            byte[] bndBytes = bnd.Repack();
+                            byte[] bndBytes = bnd.Write();
                             if (dcx)
                             {
                                 bndBytes = DCX.Compress(bndBytes);
@@ -284,27 +284,27 @@ namespace DSR_Texture_Randomizer
         private bool processBDT(BDT bdt, string baseDir, string subPath)
         {
             bool edited = false;
-            foreach (BDTEntry bdtEntry in bdt.Files)
+            foreach (BDT.File bdtEntry in bdt.Files)
             {
                 if (stop)
                     return false;
 
                 bool dcx = false;
                 byte[] bdtEntryBytes = bdtEntry.Bytes;
-                string bdtEntryExtension = Path.GetExtension(bdtEntry.Filename);
+                string bdtEntryExtension = Path.GetExtension(bdtEntry.Name);
                 if (bdtEntryExtension == ".dcx")
                 {
                     dcx = true;
                     bdtEntryBytes = DCX.Decompress(bdtEntryBytes);
-                    bdtEntryExtension = Path.GetExtension(bdtEntry.Filename.Substring(0, bdtEntry.Filename.Length - 4));
+                    bdtEntryExtension = Path.GetExtension(bdtEntry.Name.Substring(0, bdtEntry.Name.Length - 4));
                 }
 
                 if (bdtEntryExtension == ".tpf")
                 {
-                    TPF tpf = TPF.Unpack(bdtEntryBytes);
+                    TPF tpf = TPF.Read(bdtEntryBytes);
                     if (processTPF(tpf, baseDir, subPath))
                     {
-                        bdtEntry.Bytes = tpf.Repack();
+                        bdtEntry.Bytes = tpf.Write();
                         if (dcx)
                             bdtEntry.Bytes = DCX.Compress(bdtEntry.Bytes);
                         edited = true;
@@ -312,7 +312,7 @@ namespace DSR_Texture_Randomizer
                 }
                 // This whouldn't really be a problem, but I would like to know about it
                 else
-                    appendError("Error: {0}\r\n\u2514\u2500 Non-tpf found in tpfbdt: {1}", subPath, bdtEntry.Filename);
+                    appendError("Error: {0}\r\n\u2514\u2500 Non-tpf found in tpfbdt: {1}", subPath, bdtEntry.Name);
             }
             return edited;
         }
@@ -323,7 +323,7 @@ namespace DSR_Texture_Randomizer
             // thx QLOC
             List<string> names = new List<string>();
             List<string> dupes = new List<string>();
-            foreach (TPFEntry tpfEntry in tpf.Files)
+            foreach (TPF.Texture tpfEntry in tpf.Textures)
             {
                 if (names.Contains(tpfEntry.Name))
                     dupes.Add(tpfEntry.Name);
@@ -332,12 +332,12 @@ namespace DSR_Texture_Randomizer
             }
 
             bool edited = false;
-            for (int i = 0; i < tpf.Files.Count; i++)
+            for (int i = 0; i < tpf.Textures.Count; i++)
             {
                 if (stop)
                     return false;
 
-                TPFEntry tpfEntry = tpf.Files[i];
+                TPF.Texture tpfEntry = tpf.Textures[i];
                 string name = tpfEntry.Name;
                 if (dupes.Contains(name))
                     name += "_" + i;
@@ -350,7 +350,7 @@ namespace DSR_Texture_Randomizer
             return edited;
         }
 
-        private void unpackFile(TPFEntry tpfEntry, string name, string baseDir, string subDir)
+        private void unpackFile(TPF.Texture tpfEntry, string name, string baseDir, string subDir)
         {
             string subPath = subDir + "\\" + name + ".dds";
             string ddsPath = baseDir + "\\" + subPath;
@@ -369,7 +369,7 @@ namespace DSR_Texture_Randomizer
             }
         }
 
-        private bool repackFile(TPFEntry tpfEntry, string name, string baseDir, string subDir)
+        private bool repackFile(TPF.Texture tpfEntry, string name, string baseDir, string subDir)
         {
             string inputPath = getSwappedPath(name, subDir, out bool dds);
 

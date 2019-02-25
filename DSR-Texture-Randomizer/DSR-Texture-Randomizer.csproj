@@ -127,7 +127,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\DSFormats\DSFormats\DSFormats.csproj">
-      <Project>{38B89629-A437-400D-ABC6-97E76B227C41}</Project>
+      <Project>{38b89629-a437-400d-abc6-97e76b227c41}</Project>
       <Name>DSFormats</Name>
     </ProjectReference>
   </ItemGroup>
